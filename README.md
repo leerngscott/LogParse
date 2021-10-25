@@ -20,6 +20,11 @@ build/install/
 
 ## 简单使用
 
+> --all 默认输出所有的过滤结果
+```
+./LogParse --all
+```
+
 > -d 指定日志目录，会自动搜索目录下以＂.log＂结尾的文件作为日志文件，搜索深度为1
 ```
 ./LogParse -d <dir1> -d <dir2> --all
