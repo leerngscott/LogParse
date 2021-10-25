@@ -25,19 +25,23 @@ build/install/
 ./LogParse -d <dir1> -d <dir2> --all
 ```
 > -f 指定日志文件,要求绝对路径或相对路径
+```
 ./LogParse -f <file1> -f <file2> --all
-```  
+```
+    
 > -d -f可以同时使用
 > 输出默认在当前目录，也可以用-o指定
 ```
 ./LogParse -o <dir> --all  
 ```
+    
 > 默认过滤的日志是Info级别以上的日志，如果过滤的级别,可以使用-l参数
 >> [V 0, D 1, I 2, W 3, E 4]  
 ```
 ./LogParse  -l 1 
-```  
-结果的目录结构
+```
+ 
+## 结果的目录结构
 ```
 log-parse-result/
 ├── detail
@@ -47,5 +51,5 @@ log-parse-result/
 │       └── FuxiMusic
 ├── pkg-summary  // 按tag进行汇总 
 └── tag-summary  // 按进程名(一个应用可能存在多个进程，unknown表示未知进程)进行汇总 
- ```
+```
   
