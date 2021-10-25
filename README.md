@@ -27,17 +27,17 @@ build/install/
 
 > -d 指定日志目录，会自动搜索目录下以＂.log＂结尾的文件作为日志文件，搜索深度为1
 ```
-./LogParse -d <dir1> -d <dir2> --all
+./LogParse -d <dir1> -d <dir2>
 ```
 > -f 指定日志文件,要求绝对路径或相对路径
 ```
-./LogParse -f <file1> -f <file2> --all
+./LogParse -f <file1> -f <file2>
 ```
     
 > -d -f可以同时使用
 > 输出默认在当前目录，也可以用-o指定
 ```
-./LogParse -o <dir> --all  
+./LogParse -o <dir>
 ```
     
 > 默认过滤的日志是Info级别以上的日志，如果过滤的级别,可以使用-l参数
