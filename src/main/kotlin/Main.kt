@@ -14,7 +14,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
 
 
@@ -228,7 +227,7 @@ private fun mainImpl(args: Array<String>) {
             }
         }
 
-        if (dumpSbp) ParseLog.dumpTagSummary(resultList)
+        if (dumpSbt) ParseLog.dumpTagSummary(resultList)
     }
     tracker.dump()
 }

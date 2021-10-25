@@ -3,10 +3,8 @@ import Utils.Companion.info
 import Utils.Companion.warn
 import com.google.gson.Gson
 import java.io.File
-
 import java.math.RoundingMode
 import java.text.DecimalFormat
-import kotlin.Exception
 
 class ParseLog {
 
@@ -50,7 +48,7 @@ class ParseLog {
                             }
                             if (log.level.toLogLevel().level >= GlobalFilterLogLevel.level) {
                                 result.add(log)
-                                debug("$path $index ${result.size}")
+//                                debug("$path $index ${result.size}")
                             }
                         } else {
 //                            warn("$index -- $line")
@@ -71,29 +69,40 @@ class ParseLog {
             try {
                 val dumpPid = false
                 val output = File(outFile)
-                output.writeText("Size \t tag \t package")
-                if (dumpPid) output.appendText("\t pid")
+                output.writeText("Percent \t Size \t package")
+                if (dumpPid) output.appendText("\t pids")
                 output.appendText("\n")
                 output.appendText("Total ${dataList.sumOf { it.size }.toReadString()} \n")
                 // summary
                 val totalSize = dataList.sumOf { it.size }
-                dataList.groupBy {
+
+                // 给每个元素分配pkg
+                assignPkg2Line(dataList)
+
+                // 按Tag把数据分组
+                val groups = dataList.groupBy {
                     it.tag
-                }.let {
-                    // key tag
-                    val dataMap = it
-                    // except : Size Tag Pkgs Pids
-                    dataMap.map { it.key to it.value.sumOf { it.size } }.toMap().let { mapdata ->
-                        mapdata.keys.sortedByDescending { it }.forEach {
-//                            val values = mapdata[it].let { dataMap[it] }
-//                            val pids = values!!.map { it.pid }.toSet()
-//                            val tag = mapdata.get()
-//                            val percent = it.toPercent(totalSize)
-//                            val size = it.toReadString()
-//                            output.appendText("$percent \t $size \t $tag")
-//                            if (dumpPid) output.appendText("\t $pids")
-//                            output.appendText("\n")
-                        }
+                }.toMutableMap()
+
+                val dump2File = { size: Int, tag: String, pids: String ->
+                    val percent = size.toPercent(totalSize)
+                    output.appendPercent(percent)
+                    output.appendSize(size.toReadString())
+                    output.appendPkg(tag)
+                    if (dumpPid) output.appendText("\t $pids")
+                    output.appendText("\n")
+                }
+
+
+                repeat(groups.size) {
+                    groups.maxByOrNull {
+                        it.value.sumOf { it.size }
+                    }?.let { (tag, loglines) ->
+                        groups.remove(tag)
+                        val size = loglines.sumOf { it.size }
+//                        val pkgs = loglines.map { it.pkg }.flatten().toSet().toList()
+                        val pids = loglines.map { it.pid }
+                        dump2File(size, tag, pids.joinToString(" "))
                     }
                 }
             } catch (e: Exception) {
@@ -123,12 +132,21 @@ class ParseLog {
                     if (dumpPid) output.appendText("\t $pids")
                     output.appendText("\n")
                 }
+                tracker.dump("before groups")
                 // 按pkg把数据分组
                 val groups = DAOS<String, LogLine>(outputFilePath = "")
-                dataList.forEach { item ->
-                    item.pkg.forEach { groups.addDao(it, item) }
+                if (false) {
+                    val suggestJobs = (dataList.size / 3).coerceAtMost(64)
+                    MultiJob(suggestJobs).runJobs(data = dataList) {
+                        it.forEach { item -> item.pkg.forEach { groups.addDao(it, item) } }
+                    }
+                } else {
+                    dataList.forEach { item ->
+                        item.pkg.forEach { groups.addDao(it, item) }
+                    }
                 }
 
+                tracker.dump("after groups")
                 info("totalPkg size ${totalPkg.size} ${dataList.size}")
                 info("groups size ${groups.data.size} ${groups.data.sumOf { it.value.size }}")
                 repeat(totalPkg.size) {
@@ -216,7 +234,7 @@ class ParseLog {
             check(createNewFile(file = outFd))
             val pids = GlobalPkgPids.data.find {
                 it.key.split(":").first() == pkg
-            }?.value ?: return;
+            }?.value ?: return
             outFd.appendText("Pids ${pids.joinToString(" ")}\n\n")
             data.filter { it.pid in pids }.let {
                 val totalSize = it.sumOf { it.size }
@@ -261,10 +279,20 @@ class ParseLog {
 
         fun assignPkg2Line(data: List<LogLine>) {
             if (isAssignedPkg) return
-            data.forEach {
-                it.pkg.addAll(GlobalPidPkgs.filterDao(it.pid).takeIf { it.isNotEmpty() } ?: setOf(DEFAULT_PKG))
+            val tracker = TimeTracker("assignPkg2Line")
+            if (GlobalUseMultiJob) {
+                MultiJob(32).runJobs(data = data) {
+                    it.forEach {
+                        it.pkg.addAll(GlobalPidPkgs.filterDao(it.pid).takeIf { it.isNotEmpty() } ?: setOf(DEFAULT_PKG))
+                    }
+                }
+            } else {
+                data.forEach {
+                    it.pkg.addAll(GlobalPidPkgs.filterDao(it.pid).takeIf { it.isNotEmpty() } ?: setOf(DEFAULT_PKG))
+                }
             }
             isAssignedPkg = true
+            tracker.dump()
         }
 
         private var isAssignedPkg = false
