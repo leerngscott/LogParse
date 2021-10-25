@@ -1,5 +1,9 @@
 # LogParse
 
+编译
+```
+./gradlew installDist
+```
 bin目录结构
 ```
 build/install/
