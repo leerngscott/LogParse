@@ -9,11 +9,9 @@ import ParseLog.Companion.saveLogLine2File
 import Utils.Companion.debug
 import Utils.Companion.info
 import Utils.Companion.warn
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.io.File
+import kotlin.coroutines.CoroutineContext
 import kotlin.system.exitProcess
 
 
@@ -68,6 +66,8 @@ private fun mainImpl(args: Array<String>) {
         var fromCache = false
         var nextPkg = false
         var nextTag = false
+        var nextOutDir = false
+
         var save2File = false
 
         var dumpAllPkg = false
@@ -77,11 +77,14 @@ private fun mainImpl(args: Array<String>) {
         var dumpSbt = false
         val filterPkg = mutableSetOf<String>()
         val filterTag = mutableSetOf<String>()
+
+        var clearOutput = false
         args.forEach {
             debug("arg $it")
             when (it) {
                 "-h" -> {
                     info("-h Help")
+                    info("clear Clear result dir.")
                     info("-D Print debug log")
                     info(
                         "-l <Int> Min filter log level. Default is [${GlobalFilterLogLevel.level}].${
@@ -91,7 +94,9 @@ private fun mainImpl(args: Array<String>) {
                     info("-d <String> Log dir")
                     info("-f <String> Log file")
                     info("-j Enable multi job")
-                    info("-s Save cache data to file.")
+                    info("-j0 Disable multi job")
+                    info("-o Output dir, default is current dir.")
+//                    info("-s Save cache data to file.")
 
                     info("-c Enable cache mode")
                     info("\n")
@@ -110,6 +115,7 @@ private fun mainImpl(args: Array<String>) {
                 "-d" -> nextDir = true
                 "-c" -> fromCache = true
                 "-j" -> GlobalUseMultiJob = true
+                "-j0" -> GlobalUseMultiJob = false
                 "--pkg" -> nextPkg = true
                 "--tag" -> nextTag = true
                 "-s" -> save2File = true
@@ -117,16 +123,26 @@ private fun mainImpl(args: Array<String>) {
                 "--alltag" -> dumpAllTag = true
                 "--sbp" -> dumpSbp = true
                 "--sbt" -> dumpSbt = true
+                "-o" -> nextOutDir = true
+                "clear" -> clearOutput = true
+                "--all" -> {
+                    dumpAllPkg = true
+                    dumpAllTag = true
+                    dumpSbp = true
+                    dumpSbt = true
+                }
                 else -> {
                     if (nextPkg) {
                         filterPkg.add(it)
                         nextPkg = false
-                    }
-                    if (nextTag) {
+                    } else if (nextTag) {
                         filterTag.add(it)
                         nextTag = false
-                    }
-                    if (nextFile)
+                    } else if (nextOutDir) {
+                        BASE_DIR = it
+                        info("result dir is $DIR_PARSE_RESULT")
+                        nextOutDir = false
+                    } else if (nextFile)
                         fileList.add(it)
                     else if (nextDir) {
                         @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -150,6 +166,9 @@ private fun mainImpl(args: Array<String>) {
             }
         }
 
+        if (clearOutput) {
+            File(DIR_PARSE_RESULT).takeIf { it.exists() }?.deleteRecursively()
+        }
         info("filelist size ${fileList.size}")
 
         val resultList = mutableListOf<LogLine>()

@@ -69,6 +69,8 @@ class ParseLog {
             try {
                 val dumpPid = false
                 val output = File(outFile)
+
+                check(createNewFile(file = output))
                 output.writeText("Percent \t Size \t package")
                 if (dumpPid) output.appendText("\t pids")
                 output.appendText("\n")
@@ -115,6 +117,7 @@ class ParseLog {
             try {
                 val dumpPid = false
                 val output = File(outFile)
+                check(createNewFile(file = output))
                 assignPkg2Line(dataList)
                 output.writeText("Percent Size \t package")
                 if (dumpPid) output.appendText("\t pid")
@@ -230,25 +233,33 @@ class ParseLog {
         fun parseByPackage(pkg: String, data: List<LogLine>) {
             val outPath = "$DIR_PARSE_RESULT_PKG/$pkg"
             info("parseByPackage $pkg outFile: $outPath")
-            val outFd = File(outPath)
-            check(createNewFile(file = outFd))
+            val output = File(outPath)
+            check(createNewFile(file = output))
             val pids = GlobalPkgPids.data.find {
-                it.key.split(":").first() == pkg
+                it.key == pkg
             }?.value ?: return
-            outFd.appendText("Pids ${pids.joinToString(" ")}\n\n")
+            output.appendText("Pids ${pids.joinToString(" ")}\n\n")
+
+
             data.filter { it.pid in pids }.let {
                 val totalSize = it.sumOf { it.size }
-                outFd.appendText("Total size ${totalSize.toReadString()}\n\n")
-                outFd.appendText("Percent Size Tag Pids\n\n")
+                output.appendText("Total size ${totalSize.toReadString()}\n\n")
+                output.appendText("Percent Size Tag \n\n")
+
+                val dump2File = { size: Int, pkg: String ->
+                    val percent = size.toPercent(totalSize)
+                    output.appendPercent(percent)
+                    output.appendSize(size.toReadString())
+                    output.appendPkg(pkg)
+                    output.appendText("\n")
+                }
                 it.groupBy { it.tag }.let {
                     // tag logline
                     it.map {
                         // tag Size
                         it.key to it.value.sumOf { it.size }
-                    }.sortedByDescending { it.second }.joinToString("\n") {
-                        "${it.second.toPercent(totalSize)}% \t ${it.second.toReadString()} \t ${it.first}"
-                    }.let {
-                        outFd.appendText(it)
+                    }.sortedByDescending { it.second }.forEach { (tag, size) ->
+                        dump2File(size, tag)
                     }
                 }
             }
@@ -256,24 +267,28 @@ class ParseLog {
 
         fun parseByTag(tag: String, data: List<LogLine>) {
             val outPath = "$DIR_PARSE_RESULT_TAG/${tag.escape()}"
-            val outFd = File(outPath)
-            info("parseByTag $tag file:${outFd.name} path: $outPath")
+            val output = File(outPath)
+            info("parseByTag $tag file:${output.name} path: $outPath")
             check(createNewFile(path = outPath))
             data.filter { it.tag == tag }.let { logline ->
                 val totalSize = logline.sumOf { it.size }
-                outFd.appendText("Total size ${totalSize.toReadString()}\n\n")
-                outFd.appendText("Percent Size Pkg pids\n\n")
+                output.appendText("Total size ${totalSize.toReadString()}\n\n")
+                output.appendText("Percent Size Pkg\n\n")
                 // 按Pkg分组
                 assignPkg2Line(logline)
+
+                val dump2File = { size: Int, pkg: String ->
+                    val percent = size.toPercent(totalSize)
+                    output.appendPercent(percent)
+                    output.appendSize(size.toReadString())
+                    output.appendPkg(pkg)
+                    output.appendText("\n")
+                }
                 logline.asSequence().map { it.pkg }.flatten().toSet().map { pkg ->
                     pkg to logline.filter { pkg in it.pkg }.sumOf { it.size }
-                }.sortedByDescending { it.second }.joinToString("\n") {
-                    // percent size pkg
-                    val percent = it.second.toPercent(totalSize)
-                    val size = it.second
-                    val pkg = it.first
-                    "$percent% \t $size \t $pkg"
-                }.let { outFd.appendText(it) }
+                }.sortedByDescending { it.second }.forEach { (pkg, size) ->
+                    dump2File(size, pkg)
+                }
             }
         }
 
@@ -324,19 +339,29 @@ fun createNewFile(path: String? = null, file: File? = null): Boolean {
 }
 
 const val DEFAULT_PKG = "unknown"
-const val DIR_PARSE_RESULT = "log-parse-result"
-const val DIR_PARSE_RESULT_PKG = "$DIR_PARSE_RESULT/detail/pkg"
-const val DIR_PARSE_RESULT_TAG = "$DIR_PARSE_RESULT/detail/tag"
-const val DIR_PARSE_RESULT_DATA = "$DIR_PARSE_RESULT/data"
+var BASE_DIR = "./"
+val DIR_PARSE_RESULT: String
+    get() = "$BASE_DIR/log-parse-result"
+val DIR_PARSE_RESULT_PKG: String
+    get() = "$DIR_PARSE_RESULT/detail/pkg"
+val DIR_PARSE_RESULT_TAG: String
+    get() = "$DIR_PARSE_RESULT/detail/tag"
+val DIR_PARSE_RESULT_DATA: String
+    get() = "$DIR_PARSE_RESULT/data"
 
-const val FILE_LINE_DATA_FILE: String = "$DIR_PARSE_RESULT_DATA/line-data"
-const val FILE_TAG_SUMMARY_FILE = "$DIR_PARSE_RESULT/tag-summary"
-const val FILE_PKG_SUMMARY_FILE = "$DIR_PARSE_RESULT/pkg-summary"
+val FILE_LINE_DATA_FILE: String
+    get() = "$DIR_PARSE_RESULT_DATA/line-data"
+val FILE_TAG_SUMMARY_FILE: String
+    get() = "$DIR_PARSE_RESULT/tag-summary"
+val FILE_PKG_SUMMARY_FILE: String
+    get() = "$DIR_PARSE_RESULT/pkg-summary"
 
-const val PID2PKG_FILE: String = "$DIR_PARSE_RESULT_DATA/pid2pkg"
-const val PKG2PID_FILE: String = "$DIR_PARSE_RESULT_DATA/pkg2pid"
+val PID2PKG_FILE: String
+    get() = "$DIR_PARSE_RESULT_DATA/pid2pkg"
+val PKG2PID_FILE: String
+    get() = "$DIR_PARSE_RESULT_DATA/pkg2pid"
 
-var GlobalUseMultiJob = false
+var GlobalUseMultiJob = true
 var GlobalFilterLogLevel: LogLevel = LogLevel.INFO
 
 // key  pkg String
