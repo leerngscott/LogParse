@@ -8,7 +8,7 @@ class TimeTracker(private val tag: String) {
         info("$tag [start]")
     }
 
-    private fun end(): String = (System.currentTimeMillis() - start).toInt().toReadString()
+    private fun end(): String = (System.currentTimeMillis() - start).toLong().toReadString()
 
     fun dump(stage: String = "end") = info("$tag [$stage] Spend time ${end()} ms")
 }

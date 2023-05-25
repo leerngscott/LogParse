@@ -58,6 +58,9 @@ private fun mainImpl(args: Array<String>) {
     // Try adding program arguments at Run/Debug configuration
     println("Program arguments: ${args.joinToString()}")
     val tracker = TimeTracker("Main")
+    val directory = File(".")
+    val currentDirectory: String = directory.getAbsolutePath()
+    println("当前目录：$currentDirectory")
     if (args.isNotEmpty()) {
         val fileList = mutableListOf<String>()
         var nextFile = false
@@ -152,8 +155,8 @@ private fun mainImpl(args: Array<String>) {
                     } else if (nextLevel) {
                         runCatching {
                             it.toInt().toLogLevel().let { GlobalFilterLogLevel = it }
-                        }.takeIf { it.isFailure }.let {
-                            warn("bad args. pls check2 args")
+                        }.takeIf { it.isFailure }?.let {
+                            warn("bad args. pls check2 args ${it.exceptionOrNull()}")
                             tracker.dump()
                             exitProcess(-1)
                         }
@@ -168,6 +171,13 @@ private fun mainImpl(args: Array<String>) {
 
         if (clearOutput) {
             File(DIR_PARSE_RESULT).takeIf { it.exists() }?.deleteRecursively()
+            return
+        }
+
+        if (fileList.isEmpty()) {
+            File(currentDirectory).listFiles().map { it.path }.filter { it.endsWith(".log") }.also {
+                debug(it.toString())
+            }.let { fileList.addAll(it) }
         }
         info("filelist size ${fileList.size}")
 
@@ -208,11 +218,6 @@ private fun mainImpl(args: Array<String>) {
                         }
                     }
                 }
-                info("log line size ${resultList.size}")
-                if (save2File) {
-                    saveGlobalData()
-                    saveLogLine2File(resultList)
-                }
             }
         }
         // next output
@@ -247,7 +252,14 @@ private fun mainImpl(args: Array<String>) {
         }
 
         if (dumpSbt) ParseLog.dumpTagSummary(resultList)
+
+        info("log line size ${resultList.size}")
+        if (save2File) {
+            saveGlobalData()
+            saveLogLine2File(resultList)
+        }
     }
+
     tracker.dump()
 }
 

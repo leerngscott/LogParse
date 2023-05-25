@@ -87,7 +87,7 @@ private fun getGson(): Gson? {
             }
         }
     } catch (e: java.lang.Exception) {
-        e.printStackTrace()
+//        e.printStackTrace()
     }
     return gson
 }

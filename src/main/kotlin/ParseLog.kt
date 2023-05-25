@@ -20,7 +20,7 @@ class ParseLog {
 //                debug("index=$index")
 //                debug(line)
                 line.split(' ').filter { it.isNotBlank() }.let {
-//                    debug("size=${it.size}")
+                   // debug("size=${it.size}")
                     try {
                         if (it.size > 5) {
                             val log = LogLine()
@@ -31,20 +31,30 @@ class ParseLog {
                             if (log.tag.isBlank()) {
                                 throw Exception("${f.name} $index $line")
                             }
-                            log.size = line.length
+                            log.size = line.length.toLong()
                             val content = it.subList(6, it.size).joinToString(separator = " ") { it }
-                            if (log.tag == "am_pss") {
-//                                debug("am_pss $line")
+                            // debug("log.tag ${log.tag}")
+                            if (log.tag.contains("am_pss")) {
+                               // debug("am_pss $line")
                                 try {
-                                    content.split(",").takeIf { it.size == 6 }?.let {
+                                    content.split(",").takeIf {
+                                        // debug("am_pss size ${it.size}")  
+                                        it.size == 10
+                                    }?.let {
                                         val pkg = it[2]
                                         val pid = it[0].split("[")[1].trim().toInt()
                                         GlobalPkgPids.addDao(pkg, pid)
                                         GlobalPidPkgs.addDao(pid, pkg)
+                                        // debug("pkg $pkg pid $pid")
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
+                            } else if (log.tag == "ActivityManager") {
+                                val pid = log.pid
+                                val pkg = "system"
+                                GlobalPkgPids.addDao(pkg, pid)
+                                GlobalPidPkgs.addDao(pid, pkg)
                             }
                             if (log.level.toLogLevel().level >= GlobalFilterLogLevel.level) {
                                 result.add(log)
@@ -86,7 +96,7 @@ class ParseLog {
                     it.tag
                 }.toMutableMap()
 
-                val dump2File = { size: Int, tag: String, pids: String ->
+                val dump2File = { size: Long, tag: String, pids: String ->
                     val percent = size.toPercent(totalSize)
                     output.appendPercent(percent)
                     output.appendSize(size.toReadString())
@@ -127,7 +137,7 @@ class ParseLog {
                 val totalSize = dataList.sumOf { it.size }
                 val totalPkg = dataList.map { it.pkg }.flatten().toSet()
 
-                val dump2File = { size: Int, pkg: String, pids: String ->
+                val dump2File = { size: Long, pkg: String, pids: String ->
                     val percent = size.toPercent(totalSize)
                     output.appendPercent(percent)
                     output.appendSize(size.toReadString())
@@ -232,7 +242,7 @@ class ParseLog {
 
         fun parseByPackage(pkg: String, data: List<LogLine>) {
             val outPath = "$DIR_PARSE_RESULT_PKG/$pkg"
-            info("parseByPackage $pkg outFile: $outPath")
+//            info("parseByPackage $pkg outFile: $outPath")
             val output = File(outPath)
             check(createNewFile(file = output))
             val pids = GlobalPkgPids.data.find {
@@ -246,7 +256,7 @@ class ParseLog {
                 output.appendText("Total size ${totalSize.toReadString()}\n\n")
                 output.appendText("Percent Size Tag \n\n")
 
-                val dump2File = { size: Int, pkg: String ->
+                val dump2File = { size: Long, pkg: String ->
                     val percent = size.toPercent(totalSize)
                     output.appendPercent(percent)
                     output.appendSize(size.toReadString())
@@ -268,7 +278,7 @@ class ParseLog {
         fun parseByTag(tag: String, data: List<LogLine>) {
             val outPath = "$DIR_PARSE_RESULT_TAG/${tag.escape()}"
             val output = File(outPath)
-            info("parseByTag $tag file:${output.name} path: $outPath")
+//            info("parseByTag $tag file:${output.name} path: $outPath")
             check(createNewFile(path = outPath))
             data.filter { it.tag == tag }.let { logline ->
                 val totalSize = logline.sumOf { it.size }
@@ -277,7 +287,7 @@ class ParseLog {
                 // 按Pkg分组
                 assignPkg2Line(logline)
 
-                val dump2File = { size: Int, pkg: String ->
+                val dump2File = { size: Long, pkg: String ->
                     val percent = size.toPercent(totalSize)
                     output.appendPercent(percent)
                     output.appendSize(size.toReadString())
@@ -307,6 +317,16 @@ class ParseLog {
                 }
             }
             isAssignedPkg = true
+            MultiJob(32).runJobs(data = data) {
+                it.forEach {
+                    val pkg = it.pkg
+                    val pid = it.pid
+                    if (pkg.contains(DEFAULT_PKG)) {
+                        GlobalPkgPids.addDao(DEFAULT_PKG, pid)
+                        GlobalPidPkgs.addDao(pid, DEFAULT_PKG)
+                    }
+                }
+            }
             tracker.dump()
         }
 
@@ -362,7 +382,7 @@ val PKG2PID_FILE: String
     get() = "$DIR_PARSE_RESULT_DATA/pkg2pid"
 
 var GlobalUseMultiJob = true
-var GlobalFilterLogLevel: LogLevel = LogLevel.INFO
+var GlobalFilterLogLevel: LogLevel = LogLevel.VER
 
 // key  pkg String
 // value pid. Int list
@@ -402,7 +422,7 @@ fun String.fill(minWidth: Int, rightAlign: Boolean = false, alignWidth: Int = 0,
     return result
 }
 
-fun Int.toReadString(): String {
+fun Long.toReadString(): String {
 
 
     var result = ""
@@ -422,7 +442,7 @@ fun Int.toReadString(): String {
     return result.reversed()
 }
 
-fun Int.toPercent(total: Int): String {
+fun Long.toPercent(total: Long): String {
     val format = DecimalFormat("0.##").apply { roundingMode = RoundingMode.FLOOR }
     return format.format(this * 100f / total)
 }
@@ -457,7 +477,7 @@ class LogLine {
     var ppid: Int = -1
     var level: String = ""
     var tag: String = ""
-    var size: Int = 0
+    var size: Long = 0L
     var timestamp: Long = 0L
 
     // TODO 如何处理单个PID对应多个Package的问题?

@@ -1,6 +1,6 @@
 class Utils {
     companion object {
-        var debug = false
+        var debug = true
         fun debug(string: String) {
             if (debug) println(string)
         }

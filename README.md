@@ -24,7 +24,7 @@ build/install/
 
 ## 简单使用
 
-> --all 默认输出所有的过滤结果
+> --all 默认输出所有的过滤结果,默认过滤当前目录
 ```
 ./LogParse --all
 ```
@@ -44,7 +44,7 @@ build/install/
 ./LogParse -o <dir>
 ```
     
-> 默认过滤的日志是Info级别以上的日志，如果过滤的级别,可以使用-l参数
+> 默认过滤的日志是Verbose级别以上的日志，如果过滤的级别,可以使用-l参数
 >> [V 0, D 1, I 2, W 3, E 4]  
 ```
 ./LogParse  -l 1 
